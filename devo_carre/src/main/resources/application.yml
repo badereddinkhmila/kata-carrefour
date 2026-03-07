@@ -1,0 +1,57 @@
+spring:
+  application.name: devo_carre
+  threads.virtual.enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/devoteam}
+    username: ${DB_USERNAME:devoteam}
+    password: ${DB_PASSWORD:devoteam}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      pool-name: devo-carre-pool
+      auto-commit: false
+      minimum-idle: ${DB_POOL_MIN_IDLE:5}
+      maximum-pool-size: ${DB_POOL_MAX_SIZE:20}
+      connection-timeout: ${DB_POOL_CONNECTION_TIMEOUT_MS:30000}
+      validation-timeout: ${DB_POOL_VALIDATION_TIMEOUT_MS:5000}
+      idle-timeout: ${DB_POOL_IDLE_TIMEOUT_MS:600000}
+      max-lifetime: ${DB_POOL_MAX_LIFETIME_MS:1800000}
+      keepalive-time: ${DB_POOL_KEEPALIVE_MS:300000}
+      data-source-properties:
+        reWriteBatchedInserts: true
+        cachePrepStmts: true
+        prepStmtCacheSize: 250
+        prepStmtCacheSqlLimit: 2048
+        tcpKeepAlive: true
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+#      transaction:
+#        jta.platform.enabled: true
+
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc.batch_size: 50
+        order_inserts: true
+        order_updates: true
+        format_sql: true
+
+#  docker:
+#    compose:
+#      enabled: ${DOCKER_COMPOSE_ENABLED:false}
+
+app:
+  security:
+    jwt-secret: "K,ePl~h4F2Kw_=|0xG1y_MVtpRHwcWL72p-XK#-g5Nq^8qU."
+    access-token-ttl-seconds: 900
+    refresh-token-ttl-seconds: 1209600
+  reservation:
+    cleanup-cron: "0 */5 * * * *"
+
+logging:
+  level:
+    root: INFO
+    com.test.devo_carre: INFO
+  pattern:
+    level: "%5p [rid:%X{requestId:-}]"

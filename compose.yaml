@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: 'postgres:18.1-bookworm'
+    container_name: PostgreSQL
+    environment:
+      - 'POSTGRES_DB=devoteam'
+      - 'POSTGRES_PASSWORD=devoteam'
+      - 'POSTGRES_USER=devoteam'
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devoteam -d devoteam"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    image: ${BACKEND_IMAGE:-devo-carre-backend:latest}
+    container_name: Backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DB_URL=jdbc:postgresql://postgres:5432/devoteam
+      - DB_USERNAME=devoteam
+      - DB_PASSWORD=devoteam
+      - SPRING_PROFILES_ACTIVE=${PROFILE:-dev}
+    ports:
+      - '8080:8080'
+
+  client:
+    image: ${CLIENT_IMAGE:-devo-carre-client:latest}
+    container_name: Frontend
+    depends_on:
+      - backend
+    ports:
+      - '4200:80'

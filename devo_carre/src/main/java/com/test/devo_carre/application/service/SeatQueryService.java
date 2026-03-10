@@ -4,6 +4,7 @@ import com.test.devo_carre.application.dto.SeatView;
 import com.test.devo_carre.application.port.in.ListEventSeatsUseCase;
 import com.test.devo_carre.application.port.out.ClockPort;
 import com.test.devo_carre.domain.model.ReservationStatus;
+import com.test.devo_carre.security.ResourceNotFoundException;
 import com.test.devo_carre.domain.repository.EventRepository;
 import com.test.devo_carre.domain.repository.ReservationRepository;
 import com.test.devo_carre.domain.repository.SeatRepository;
@@ -40,7 +41,7 @@ public class SeatQueryService implements ListEventSeatsUseCase {
     public List<SeatView> listSeats(UUID eventId) {
         log.debug("Listing seats for eventId={}", eventId);
         var event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new IllegalArgumentException("Event not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
 
         var activeReservationsBySeat = reservationRepository.findActiveByEventId(eventId, clockPort.now()).stream()
                 .collect(java.util.stream.Collectors.toMap(r -> r.seatId(), r -> r, (a, b) -> a));

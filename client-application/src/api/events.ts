@@ -65,8 +65,11 @@ export const eventsApi = {
             try {
               const payload = seatUpdateEventSchema.parse(JSON.parse(data));
               options.onMessage(payload);
-            } catch {
-              // ignore parse errors for unknown event shapes
+            } catch (parseError) {
+              console.error("[EventStream] Parse error for chunk:", {
+                chunk: data.slice(0, 200),
+                error: parseError,
+              });
             }
           }
         }

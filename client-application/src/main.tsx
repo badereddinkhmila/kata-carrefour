@@ -7,6 +7,7 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 import { AuthHydrationGate } from "@/components/auth-hydration-gate";
+import { ErrorBoundary } from "@/components/error-boundary";
 import "./index.css";
 
 const router = createRouter({ routeTree });
@@ -19,8 +20,10 @@ declare module "@tanstack/react-router" {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <AuthHydrationGate>
-      <RouterProvider router={router} />
-    </AuthHydrationGate>
+    <ErrorBoundary>
+      <AuthHydrationGate>
+        <RouterProvider router={router} />
+      </AuthHydrationGate>
+    </ErrorBoundary>
   </StrictMode>
 );

@@ -42,6 +42,10 @@ spring:
 #      enabled: ${DOCKER_COMPOSE_ENABLED:false}
 
 app:
+  sse:
+    timeout-ms: ${SSE_TIMEOUT_MS:300000}
+  cors:
+    allowed-origins: http://localhost:4200
   security:
     jwt-secret: "K,ePl~h4F2Kw_=|0xG1y_MVtpRHwcWL72p-XK#-g5Nq^8qU."
     access-token-ttl-seconds: 900

@@ -3,12 +3,26 @@ import { API_BASE_URL } from "@/lib/constants";
 import { useAuthStore } from "@/stores/auth-store";
 import { authResponseSchema } from "@/schemas";
 
+export const authClient = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
   },
 });
+
+const syncAuthHeader = () => {
+  const token = useAuthStore.getState().accessToken;
+  apiClient.defaults.headers.common.Authorization = token ? `Bearer ${token}` : "";
+};
+syncAuthHeader();
+useAuthStore.subscribe(syncAuthHeader);
 
 let isRefreshing = false;
 let failedQueue: Array<{
@@ -28,13 +42,7 @@ const processQueue = (error: Error | null, token: string | null = null) => {
 };
 
 apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = useAuthStore.getState().accessToken;
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
+  (config: InternalAxiosRequestConfig) => config,
   (error) => Promise.reject(error)
 );
 
@@ -63,10 +71,9 @@ apiClient.interceptors.response.use(
       }
 
       try {
-        const { data } = await axios.post(
-          `${API_BASE_URL}/auth/refresh`,
-          { refreshToken }
-        );
+        const { data } = await authClient.post("/auth/refresh", {
+          refreshToken,
+        });
         const parsed = authResponseSchema.parse(data);
         useAuthStore.getState().setTokens({
           accessToken: parsed.accessToken,

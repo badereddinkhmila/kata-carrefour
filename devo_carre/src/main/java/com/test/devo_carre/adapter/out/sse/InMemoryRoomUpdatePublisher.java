@@ -5,6 +5,7 @@ import com.test.devo_carre.application.port.out.RoomUpdatePublisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -21,6 +22,11 @@ public class InMemoryRoomUpdatePublisher implements RoomUpdatePublisher {
 
     private static final Logger log = LoggerFactory.getLogger(InMemoryRoomUpdatePublisher.class);
     private final Map<UUID, List<SseEmitter>> subscribers = new ConcurrentHashMap<>();
+    private final long timeoutMs;
+
+    public InMemoryRoomUpdatePublisher(@Value("${app.sse.timeout-ms:300000}") long timeoutMs) {
+        this.timeoutMs = timeoutMs;
+    }
 
     @Override
     public void publish(RoomUpdateView update) {
@@ -31,7 +37,7 @@ public class InMemoryRoomUpdatePublisher implements RoomUpdatePublisher {
             try {
                 emitter.send(SseEmitter.event().name("room-update").data(update));
             } catch (IOException | IllegalStateException ex) {
-                log.debug("Dropping disconnected SSE emitter eventId={} reason={}", update.eventId(), ex.getMessage());
+                log.warn("Dropping disconnected SSE emitter eventId={} reason={}", update.eventId(), ex.getMessage());
                 removeSubscriber(update.eventId(), emitter);
                 try {
                     emitter.complete();
@@ -42,10 +48,10 @@ public class InMemoryRoomUpdatePublisher implements RoomUpdatePublisher {
 
     @Override
     public SseEmitter subscribe(UUID eventId) {
-        var emitter = new SseEmitter(0L);
+        var emitter = new SseEmitter(timeoutMs);
         var emitters = subscribers.computeIfAbsent(eventId, ignored -> new CopyOnWriteArrayList<>());
         emitters.add(emitter);
-        log.info("SSE subscriber added eventId={} subscriberCount={}", eventId, emitters.size());
+        log.info("SSE subscriber added eventId={} subscriberCount={} timeoutMs={}", eventId, emitters.size(), timeoutMs);
 
         emitter.onCompletion(() -> {
             removeSubscriber(eventId, emitter);

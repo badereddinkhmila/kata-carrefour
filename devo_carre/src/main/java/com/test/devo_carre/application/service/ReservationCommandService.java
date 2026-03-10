@@ -14,6 +14,7 @@ import com.test.devo_carre.domain.repository.EventRepository;
 import com.test.devo_carre.domain.repository.ReservationRepository;
 import com.test.devo_carre.domain.repository.SeatRepository;
 import com.test.devo_carre.domain.service.ReservationPolicy;
+import com.test.devo_carre.security.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
@@ -58,10 +59,15 @@ public class ReservationCommandService implements ReserveSeatUseCase, ConfirmRes
     public ReservationView reserve(UUID eventId, UUID seatId, UUID userId) {
         log.info("Reserve request eventId={} seatId={} userId={}", eventId, seatId, userId);
         var event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new IllegalArgumentException("Event not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
+
+        var now = clockPort.now();
+        if (event.startsAt() != null && event.startsAt().isBefore(now)) {
+            throw new IllegalStateException("Event has already started");
+        }
 
         var seat = seatRepository.findById(seatId)
-                .orElseThrow(() -> new IllegalArgumentException("Seat not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Seat not found"));
 
         if (!seat.roomId().equals(event.roomId())) {
             throw new IllegalArgumentException("Seat does not belong to event room");
@@ -69,7 +75,6 @@ public class ReservationCommandService implements ReserveSeatUseCase, ConfirmRes
 
         reservationPolicy.ensureSeatExists(seat);
 
-        var now = clockPort.now();
         if (reservationRepository.findActiveByEventIdAndSeatId(eventId, seatId, now).isPresent()) {
             log.warn("Reserve rejected seat already reserved eventId={} seatId={} userId={}", eventId, seatId, userId);
             throw new IllegalStateException("Seat is already reserved");
@@ -110,7 +115,7 @@ public class ReservationCommandService implements ReserveSeatUseCase, ConfirmRes
     public ReservationView confirm(UUID reservationId, UUID userId) {
         log.info("Confirm request reservationId={} userId={}", reservationId, userId);
         var reservation = reservationRepository.findById(reservationId)
-                .orElseThrow(() -> new IllegalArgumentException("Reservation not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found"));
 
         if (!reservation.userId().equals(userId)) {
             log.warn("Confirm rejected ownership mismatch reservationId={} ownerUserId={} requestUserId={}",
@@ -137,7 +142,7 @@ public class ReservationCommandService implements ReserveSeatUseCase, ConfirmRes
 
         for (var seatId : seatIds) {
             var reservation = reservationRepository.findActiveByEventIdAndSeatIdAndUserId(eventId, seatId, userId, now)
-                    .orElseThrow(() -> new IllegalArgumentException("Reservation not found for seat " + seatId));
+                    .orElseThrow(() -> new ResourceNotFoundException("Reservation not found for seat " + seatId));
             if (reservation.status() != ReservationStatus.PENDING) {
                 log.warn("Confirm rejected status={} eventId={} seatId={} userId={}",
                         reservation.status(), eventId, seatId, userId);
@@ -160,7 +165,7 @@ public class ReservationCommandService implements ReserveSeatUseCase, ConfirmRes
 
         for (var seatId : seatIds) {
             var reservation = reservationRepository.findActiveByEventIdAndSeatIdAndUserId(eventId, seatId, userId, now)
-                    .orElseThrow(() -> new IllegalArgumentException("Reservation not found for seat " + seatId));
+                    .orElseThrow(() -> new ResourceNotFoundException("Reservation not found for seat " + seatId));
 
             var updatedReservation = reservation.cancel();
             var saved = reservationRepository.save(updatedReservation);

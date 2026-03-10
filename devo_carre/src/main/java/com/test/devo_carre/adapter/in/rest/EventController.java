@@ -9,7 +9,10 @@ import com.test.devo_carre.application.port.in.ListEventSeatsUseCase;
 import com.test.devo_carre.application.port.in.ListEventsUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.springframework.context.annotation.Profile;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,6 +26,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/events")
 @Tag(name = "Events")
 @Profile("!cli")
+@Validated
 public class EventController {
 
     private final ListEventsUseCase listEventsUseCase;
@@ -40,8 +44,8 @@ public class EventController {
     @GetMapping
     @Operation(summary = "List events (paginated)")
     public PagedResponse<EventView> listEvents(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size
     ) {
         return listEventsUseCase.listEvents(page, size);
     }

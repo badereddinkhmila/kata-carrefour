@@ -1,121 +1,22 @@
 # DEVOTEAM KATA
 
-A full-stack application with a **React + Vite** frontend, **Spring Boot** backend, and **PostgreSQL** database.
+A full-stack application with a React + Vite frontend, Spring Boot backend, and PostgreSQL database.
 
-## How to run the app (local)
+## Project Overview
 
-1. **Start the database**
-   ```bash
-   make up
-   ```
+This project provides an event reservation system with JWT authentication, SSE updates, and scheduled cleanup of expired reservations.
 
-2. **Install frontend dependencies and start the client**
-   ```bash
-   cd client-application
-   bun install   # or: npm install
-   bun run dev   # or: npm run dev
-   ```
+## Key Features
 
-3. **In another terminal, start the backend**
-   ```bash
-   make run-dev
-   ```
+- JWT-based authentication (access + refresh tokens)
+- Event listing and reservation flow
+- Real-time seat updates via SSE
+- Scheduled cleanup of expired reservations
+- Hexagonal/clean architecture separation
 
-Backend API: http://localhost:8080. Frontend: use the URL shown by the dev server (e.g. http://localhost:5173).
+## Architecture
 
----
-
-## Prerequisites
-
-- **Docker** and **Docker Compose** (for running with containers)
-- **Java 25** and **Maven** (for local backend)
-- **Bun or Node** (for local frontend)
-
-## Quick start (Docker)
-
-To start everything with Docker (PostgreSQL + backend + client):
-
-```bash
-make run
-```
-
-This will:
-
-1. Start PostgreSQL
-2. Build the backend and client images
-3. Clean and seed the database
-4. Start the backend and client containers
-
-- **Backend API:** http://localhost:8080  
-- **Frontend:** http://localhost:4200
-
-Use `PROFILE=staging make run` (or another profile) to run with a different Spring profile.
-
-## Local development
-
-### 1. Start the database
-
-```bash
-make up
-```
-
-This starts only PostgreSQL (port 5432).
-
-### 2. Clean the database
-
-```bash
-make clean
-```
-
-### 3. Seed the database (first time)
-
-```bash
-make seed
-```
-
-Use `make seed PROFILE=staging` for another profile. To reset data: `make clean` then `make seed`.
-
-### 3. Start the backend
-
-```bash
-make run-dev
-```
-
-Runs the Spring Boot app with the `dev` profile (default). Override with `make run-dev PROFILE=staging`. API is at http://localhost:8080.
-
-### 4. Start the frontend
-
-In another terminal:
-
-```bash
-make frontend
-```
-
-Runs the React app with Bun (e.g. Vite dev server). Use the URL shown in the terminal (http://localhost:4200).
-
-
-## Other useful commands
-
-| Command | Description |
-|--------|-------------|
-| `make help` | List all Make targets |
-| `make up` | Start PostgreSQL only |
-| `make seed PROFILE=dev` | Seed database (default profile: `dev`) |
-| `make clean PROFILE=dev` | Clean all database data (requires confirmation) |
-| `make run-dev PROFILE=dev` | Run Spring Boot locally |
-| `make frontend` | Run React client locally |
-| `make package` | Build backend JAR (skips tests) |
-| `make bootstrap-images` | Start postgres, build backend/client images, clean+seed DB |
-| `make run PROFILE=dev` | Full bootstrap + start Docker stack |
-
-## Project layout
-
-- **devo_carre/** — Spring Boot backend
-- **client-application/** — React + Vite frontend
-- **compose.yaml** — Docker Compose (postgres, backend, client)
-- **Makefile** — Main entry point for all commands
-
-## 1) General Architecture (Frontend -> Backend -> Database)
+### 1) General Architecture (Frontend -> Backend -> Database)
 
 ```mermaid
 flowchart LR
@@ -127,7 +28,7 @@ flowchart LR
     B -->|Scheduled cleanup job| D
 ```
 
-## 2) Backend Packages and Key Classes
+### 2) Backend Packages and Key Classes
 
 Package diagram (layers left → right). Dependencies: config → adapter.in → application → domain ← adapter.out.
 
@@ -179,7 +80,7 @@ flowchart LR
     ADO --> DOM
 ```
 
-## 3) Backend Architecture (Clean/Hexagonal View)
+### 3) Backend Architecture (Clean/Hexagonal View)
 
 ```mermaid
 flowchart LR
@@ -214,3 +115,79 @@ flowchart LR
     OUTP --> OUTBOUND
     OUTBOUND --> DB
 ```
+
+## Quick Start (Docker)
+
+To start everything with Docker (PostgreSQL + backend + client):
+
+```bash
+make run
+```
+
+This will:
+- Start PostgreSQL
+- Build the backend and client images
+- Clean and seed the database
+- Start the backend and client containers
+
+- Backend API: http://localhost:8080
+- Frontend (Docker): http://localhost:4200
+
+Use `PROFILE=staging make run` (or another profile) to run with a different Spring profile.
+
+## Local Development
+
+### 1) Start the database
+
+```bash
+make up
+```
+
+### 2) Clean the database (optional)
+
+```bash
+make clean
+```
+
+### 3) Seed the database (first time)
+
+```bash
+make seed
+```
+
+### 4) Start the backend
+
+```bash
+make run-dev
+```
+
+Backend API: http://localhost:8080
+
+### 5) Start the frontend
+
+```bash
+make frontend
+```
+
+Vite dev server: use the URL printed in the terminal (commonly http://localhost:5173).
+
+## Project Layout
+
+- devo_carre/ — Spring Boot backend
+- client-application/ — React + Vite frontend
+- compose.yaml — Docker Compose (postgres, backend, client)
+- Makefile — Main entry point for all commands
+
+## Useful Commands
+
+| Command | Description |
+|--------|-------------|
+| `make help` | List all Make targets |
+| `make up` | Start PostgreSQL only |
+| `make seed PROFILE=dev` | Seed database (default profile: dev) |
+| `make clean PROFILE=dev` | Clean all database data (requires confirmation) |
+| `make run-dev PROFILE=dev` | Run Spring Boot locally |
+| `make frontend` | Run React client locally |
+| `make package` | Build backend JAR (skips tests) |
+| `make bootstrap-images` | Start postgres, build backend/client images, clean+seed DB |
+| `make run PROFILE=dev` | Full bootstrap + start Docker stack |

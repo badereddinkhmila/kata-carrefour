@@ -13,6 +13,7 @@ import com.test.devo_carre.domain.repository.EventRepository;
 import com.test.devo_carre.domain.repository.ReservationRepository;
 import com.test.devo_carre.domain.repository.RoomRepository;
 import com.test.devo_carre.domain.repository.SeatRepository;
+import com.test.devo_carre.security.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
@@ -73,10 +74,10 @@ public class EventQueryService implements ListEventsUseCase, GetEventReservation
     public EventReservationDetailView getDetail(UUID eventId) {
         log.debug("Fetching reservation detail for eventId={}", eventId);
         var event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new IllegalArgumentException("Event not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
 
         var room = roomRepository.findById(event.roomId())
-                .orElseThrow(() -> new IllegalArgumentException("Room not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Room not found"));
 
         var activeReservationsBySeat = reservationRepository.findActiveByEventId(eventId, clockPort.now()).stream()
                 .collect(java.util.stream.Collectors.toMap(r -> r.seatId(), r -> r, (a, b) -> a));

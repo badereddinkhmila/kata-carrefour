@@ -191,3 +191,38 @@ Vite dev server: use the URL printed in the terminal (commonly http://localhost:
 | `make package` | Build backend JAR (skips tests) |
 | `make bootstrap-images` | Start postgres, build backend/client images, clean+seed DB |
 | `make run PROFILE=dev` | Full bootstrap + start Docker stack |
+
+## Kubernetes (kind + Helm)
+
+Local workflow using kind and the Helm charts:
+
+```bash
+make kind-bootstrap
+```
+
+This command will:
+- Create a kind cluster (`devoteam-local`)
+- Build and load backend/client Docker images into kind
+- Deploy PostgreSQL in namespace `devoteam`
+- Install/upgrade backend and client Helm releases
+
+Expose postgres/frontend/backend to localhost:
+
+```bash
+make k8s-port-forward
+```
+
+- PostgreSQL: `localhost:5432`
+- Frontend: http://localhost:4200
+- Backend: http://localhost:8080
+- Override local ports if needed: `make k8s-port-forward POSTGRES_PORT=5433 BACKEND_PORT=8081 CLIENT_PORT=4201`
+
+Useful related commands:
+- `make kind-status`
+- `make k8s-seed` (one-shot backend seed job in-cluster)
+- `make k8s-undeploy`
+- `make kind-delete`
+- `make helm-package`
+- `make helm-push HELM_OCI_REPO=oci://<registry>/<repo>`
+
+If `make kind-bootstrap` stalls while waiting for PostgreSQL, the updated make flow now re-enables scheduling on local kind nodes before waiting and prints node/pod status if PostgreSQL still cannot become available.

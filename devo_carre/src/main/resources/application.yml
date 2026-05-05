@@ -26,8 +26,8 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-#      transaction:
-#        jta.platform.enabled: true
+    #      transaction:
+    #        jta.platform.enabled: true
 
     open-in-view: false
     properties:
@@ -59,3 +59,9 @@ logging:
     com.test.devo_carre: INFO
   pattern:
     level: "%5p [rid:%X{requestId:-}]"
+
+management:
+  endpoint.health.probes.enabled: true
+  health:
+    livenessState.enabled: true
+    readinessState.enabled: true

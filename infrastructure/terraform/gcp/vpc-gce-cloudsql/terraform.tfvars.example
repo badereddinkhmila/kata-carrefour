@@ -1,0 +1,5 @@
+gcp_project_id = "your-gcp-project"
+gcp_region     = "us-central1"
+gcp_zone       = "us-central1-a"
+app_image      = "ghcr.io/your-org/devo-carre:latest"
+db_password    = "replace-with-strong-password"

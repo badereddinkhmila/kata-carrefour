@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ReservationStatus } from "./reservation";
 
 const uuidSchema = z.string().uuid();
 
@@ -59,8 +60,11 @@ export type EventReservationDetailView = z.infer<
 export type ReserveSeatCommand = z.infer<typeof reserveSeatCommandSchema>;
 
 export const seatUpdateEventSchema = z.object({
+  eventId: uuidSchema,
   seatId: uuidSchema,
-  reserved: z.boolean(),
-  reservedByUserId: z.string().uuid().optional().nullable(),
+  reservationId: uuidSchema,
+  status: z.nativeEnum(ReservationStatus),
+  expiresAt: z.string().nullable().optional(),
+  occurredAt: z.string(),
 });
 export type SeatUpdateEvent = z.infer<typeof seatUpdateEventSchema>;

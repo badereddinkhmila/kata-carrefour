@@ -18,7 +18,6 @@ const createTestQueryClient = () =>
     },
   });
 
-/** Ref set by Wrapper so the test router root can render the component under test synchronously */
 const slotRef = createRef<ReactNode>();
 
 function createTestRouter() {
@@ -40,7 +39,7 @@ function createTestRouter() {
 
 export function renderWithProviders(
   ui: ReactElement,
-  options?: Omit<RenderOptions, "wrapper">
+  options?: Omit<RenderOptions, "wrapper">,
 ) {
   const queryClient = createTestQueryClient();
   const router = createTestRouter();

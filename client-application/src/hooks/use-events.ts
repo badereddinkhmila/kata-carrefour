@@ -13,6 +13,7 @@ import { reservationsApi } from "@/api/reservations";
 import { useReservationCartStore } from "@/stores/reservation-cart-store";
 import type { EventReservationDetailView } from "@/schemas";
 import type { ReservationBatchItemCommand } from "@/schemas";
+import { ReservationStatus } from "@/schemas";
 
 const EVENTS_QUERY_KEY = ["events"] as const;
 const EVENT_DETAIL_QUERY_KEY = (eventId: string) => ["event", eventId] as const;
@@ -87,6 +88,7 @@ export function useEventSeatsStream(eventId: string, options?: UseEventSeatsStre
       .subscribeSeatsStream(eventId, {
         signal: controller.signal,
         onMessage: (payload) => {
+          console.log("onMessage", payload);
           setConnectionState("connected");
           const prev = queryClient.getQueryData<EventReservationDetailView>(
             EVENT_DETAIL_QUERY_KEY(eventId)
@@ -94,7 +96,10 @@ export function useEventSeatsStream(eventId: string, options?: UseEventSeatsStre
           const seatLabel =
             prev?.seats.find((s) => s.id === payload.seatId)?.seatNumber ??
             `Seat ${payload.seatId.slice(0, 8)}`;
-          if (payload.reserved) {
+          const held =
+            payload.status === ReservationStatus.PENDING ||
+            payload.status === ReservationStatus.CONFIRMED;
+          if (held) {
             toast.info("Seat update", {
               description: `${seatLabel} was reserved.`,
             });

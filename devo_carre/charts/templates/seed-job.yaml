@@ -1,0 +1,52 @@
+{{- if .Values.seed.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "dc-backend.fullname" . }}-seed{{- if .Values.seed.runId }}-{{ .Values.seed.runId | trunc 12 }}{{- end }}
+  labels:
+    {{- include "dc-backend.labels" . | nindent 4 }}
+    app.kubernetes.io/component: seed
+  annotations:
+    helm.sh/hook: {{ .Values.seed.hook | quote }}
+    helm.sh/hook-delete-policy: {{ .Values.seed.hookDeletePolicy | quote }}
+spec:
+  backoffLimit: {{ .Values.seed.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.seed.ttlSecondsAfterFinished }}
+  template:
+    metadata:
+      labels:
+        {{- include "dc-backend.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: seed
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "dc-backend.serviceAccountName" . }}
+      containers:
+        - name: seed
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - seed-data
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: {{ printf "%s,cli" .Values.backend.springProfile | quote }}
+            - name: SPRING_MAIN_WEB_APPLICATION_TYPE
+              value: none
+            - name: DB_URL
+              value: {{ printf "jdbc:postgresql://%s:%v/%s" .Values.backend.database.host .Values.backend.database.port .Values.backend.database.name | quote }}
+            - name: DB_USERNAME
+              value: {{ .Values.backend.database.user | quote }}
+            {{- if .Values.backend.database.existingSecret }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.database.existingSecret | quote }}
+                  key: {{ .Values.backend.database.existingSecretKey | quote }}
+            {{- else }}
+            - name: DB_PASSWORD
+              value: {{ .Values.backend.database.password | quote }}
+            {{- end }}
+{{- end }}

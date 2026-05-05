@@ -12,7 +12,7 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary>
         <div>Content</div>
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
 
     expect(screen.getByText("Content")).toBeInTheDocument();
@@ -25,15 +25,21 @@ describe("ErrorBoundary", () => {
     render(
       <ErrorBoundary>
         <ThrowError />
-      </ErrorBoundary>
+      </ErrorBoundary>,
     );
 
-    expect(screen.getByRole("heading", { name: /something went wrong/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /something went wrong/i }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/unexpected error occurred/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /home/i })).toHaveAttribute("href", "/");
+    expect(
+      screen.getByRole("button", { name: /try again/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /home/i })).toHaveAttribute(
+      "href",
+      "/",
+    );
 
     vi.restoreAllMocks();
   });
-
 });

@@ -1,0 +1,79 @@
+replicaCount: 1
+
+image:
+  repository: devo-carre-backend
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: false
+  automount: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: backend.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources: {}
+
+livenessProbe:
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 15
+  periodSeconds: 10
+readinessProbe:
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+backend:
+  springProfile: dev
+  database:
+    host: postgres
+    port: 5432
+    name: devoteam
+    user: devoteam
+    password: devoteam
+    existingSecret: ""
+    existingSecretKey: db-password
+
+seed:
+  enabled: false
+  hook: "post-install"
+  hookDeletePolicy: "before-hook-creation,hook-succeeded"
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 300
+  runId: ""

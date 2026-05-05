@@ -1,0 +1,6 @@
+aws_region       = "us-east-1"
+ec2_ami_id       = "ami-xxxxxxxxxxxxxxxxx"
+app_image        = "ghcr.io/your-org/devo-carre:latest"
+db_password      = "replace-with-strong-password"
+ec2_key_name     = "optional-keypair"
+ssh_ingress_cidrs = ["YOUR_IP/32"]

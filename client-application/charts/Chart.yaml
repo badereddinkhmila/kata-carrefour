@@ -1,0 +1,6 @@
+apiVersion: v2
+name: dc-client
+description: Helm chart for the Devoteam Carrefour frontend application
+type: application
+version: 0.1.0
+appVersion: "latest"

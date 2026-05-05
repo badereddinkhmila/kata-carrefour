@@ -1,0 +1,14 @@
+#!/bin/bash
+set -euxo pipefail
+
+apt-get update -y
+apt-get install -y docker.io
+systemctl enable docker
+systemctl start docker
+
+docker rm -f devo-carre || true
+docker run -d --name devo-carre -p ${app_port}:8080 \
+  -e DB_URL=${db_url} \
+  -e DB_USERNAME=${db_username} \
+  -e DB_PASSWORD=${db_password} \
+  ${app_image}

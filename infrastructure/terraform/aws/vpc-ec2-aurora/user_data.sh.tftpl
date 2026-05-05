@@ -1,0 +1,31 @@
+#!/bin/bash
+set -euxo pipefail
+
+yum update -y
+yum install -y docker
+systemctl enable docker
+systemctl start docker
+
+cat >/etc/systemd/system/devo-carre.service <<UNIT
+[Unit]
+Description=devo-carre backend container
+After=docker.service
+Requires=docker.service
+
+[Service]
+Restart=always
+ExecStartPre=-/usr/bin/docker rm -f devo-carre
+ExecStart=/usr/bin/docker run --name devo-carre -p ${app_port}:8080 \
+  -e DB_URL=${db_url} \
+  -e DB_USERNAME=${db_username} \
+  -e DB_PASSWORD=${db_password} \
+  ${app_image}
+ExecStop=/usr/bin/docker stop devo-carre
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable devo-carre
+systemctl start devo-carre

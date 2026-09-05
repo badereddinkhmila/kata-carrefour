@@ -40,7 +40,7 @@ public class JpaSeatRepositoryAdapter implements SeatRepository {
     }
 
     private Seat toDomain(SeatEntity entity) {
-        return new Seat(entity.getId(), entity.getRoomId(), entity.getSeatNumber(), entity.getVersion());
+        return new Seat(entity.getId(), entity.getRoomId(), entity.getSeatNumber(), entity.getCapacity(), entity.getVersion());
     }
 
     private SeatEntity toEntity(Seat seat) {
@@ -48,6 +48,7 @@ public class JpaSeatRepositoryAdapter implements SeatRepository {
         entity.setId(seat.id());
         entity.setRoomId(seat.roomId());
         entity.setSeatNumber(seat.seatNumber());
+        entity.setCapacity(seat.capacity());
         entity.setVersion(seat.version());
         return entity;
     }

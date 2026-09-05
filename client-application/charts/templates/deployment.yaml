@@ -44,6 +44,11 @@ spec:
             - name: http
               containerPort: 80
               protocol: TCP
+          env:
+            - name: FARO_COLLECTOR_UPSTREAM
+              value: {{ .Values.observability.faroCollectorUpstream | quote }}
+            - name: FARO_DNS_RESOLVER
+              value: {{ .Values.observability.faroDnsResolver | quote }}
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}
           readinessProbe:

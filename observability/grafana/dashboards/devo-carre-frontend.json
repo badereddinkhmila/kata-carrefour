@@ -1,0 +1,119 @@
+{
+  "annotations": {"list": []},
+  "description": "Browser telemetry ingested by Grafana Faro through the client application's same-origin /collect proxy. This dashboard intentionally contains aggregate receiver metrics and scrubbed Loki payloads only.",
+  "editable": true,
+  "graphTooltip": 1,
+  "links": [
+    {"includeTimeRange": true, "keepTime": true, "targetBlank": false, "title": "Application overview", "type": "link", "url": "/d/devo-carre-overview"}
+  ],
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Alloy Receiver", "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "targets": [{"expr": "max(up{job=\"alloy\"})", "refId": "A"}],
+      "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}], "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 2, "type": "stat", "title": "Browser Events (1h)", "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "targets": [{"expr": "sum(increase(faro_receiver_events_total[1h]))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"decimals": 0, "unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 3, "type": "stat", "title": "Browser Exceptions (1h)", "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "targets": [{"expr": "sum(increase(faro_receiver_exceptions_total[1h]))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"decimals": 0, "unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}, {"color": "red", "value": 10}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 4, "type": "stat", "title": "Receiver Export Errors (1h)", "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "targets": [{"expr": "sum(increase(faro_receiver_exporter_errors_total[1h]))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"decimals": 0, "unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "background", "graphMode": "area", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 5, "type": "stat", "title": "p95 Intake Latency", "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 0},
+      "targets": [{"expr": "histogram_quantile(0.95, sum by (le) (rate(faro_receiver_request_duration_seconds_bucket[$__rate_interval])))", "refId": "A"}],
+      "fieldConfig": {"defaults": {"unit": "s", "decimals": 3, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 0.25}, {"color": "red", "value": 1}]}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 6, "type": "stat", "title": "In-Flight Requests", "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 4, "w": 4, "x": 20, "y": 0},
+      "targets": [{"expr": "sum(faro_receiver_inflight_requests)", "refId": "A"}],
+      "fieldConfig": {"defaults": {"decimals": 0, "unit": "short", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 25}, {"color": "red", "value": 50}]}}, "overrides": []},
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "center", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}}
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Browser Telemetry Intake by Signal", "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+      "targets": [
+        {"expr": "sum(rate(faro_receiver_events_total[$__rate_interval]))", "legendFormat": "events", "refId": "A"},
+        {"expr": "sum(rate(faro_receiver_exceptions_total[$__rate_interval]))", "legendFormat": "exceptions", "refId": "B"},
+        {"expr": "sum(rate(faro_receiver_measurements_total[$__rate_interval]))", "legendFormat": "measurements (Web Vitals)", "refId": "C"},
+        {"expr": "sum(rate(faro_receiver_logs_total[$__rate_interval]))", "legendFormat": "logs", "refId": "D"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Faro Intake Latency", "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le) (rate(faro_receiver_request_duration_seconds_bucket[$__rate_interval])))", "legendFormat": "p50", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(faro_receiver_request_duration_seconds_bucket[$__rate_interval])))", "legendFormat": "p95", "refId": "B"},
+        {"expr": "histogram_quantile(0.99, sum by (le) (rate(faro_receiver_request_duration_seconds_bucket[$__rate_interval])))", "legendFormat": "p99", "refId": "C"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "s", "min": 0}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Payload Size", "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+      "targets": [
+        {"expr": "histogram_quantile(0.50, sum by (le) (rate(faro_receiver_request_message_bytes_bucket[$__rate_interval])))", "legendFormat": "p50 request", "refId": "A"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(faro_receiver_request_message_bytes_bucket[$__rate_interval])))", "legendFormat": "p95 request", "refId": "B"},
+        {"expr": "histogram_quantile(0.95, sum by (le) (rate(faro_receiver_response_message_bytes_bucket[$__rate_interval])))", "legendFormat": "p95 response", "refId": "C"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "bytes", "min": 0}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "Receiver Failures and Rate Limit Activity", "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+      "targets": [
+        {"expr": "sum(rate(faro_receiver_exporter_errors_total[$__rate_interval]))", "legendFormat": "export errors", "refId": "A"},
+        {"expr": "sum(faro_receiver_rate_limiter_active_app)", "legendFormat": "active applications", "refId": "B"},
+        {"expr": "sum(rate(faro_receiver_rate_limiter_requests_total[$__rate_interval]))", "legendFormat": "rate-limited requests", "refId": "C"}
+      ],
+      "fieldConfig": {"defaults": {"unit": "ops", "min": 0}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "showLegend": true}, "tooltip": {"mode": "multi"}}
+    },
+    {
+      "id": 11, "type": "logs", "title": "Browser Events, Errors, and Web Vitals", "datasource": {"type": "loki", "uid": "loki"},
+      "gridPos": {"h": 11, "w": 24, "x": 0, "y": 20},
+      "targets": [{"expr": "{source=\"faro\", application=\"client-application\"} | json", "refId": "A"}],
+      "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": true, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true}
+    },
+    {
+      "id": 12, "type": "traces", "title": "Browser Traces", "datasource": {"type": "tempo", "uid": "tempo"},
+      "gridPos": {"h": 11, "w": 24, "x": 0, "y": 31},
+      "targets": [{"limit": 20, "query": "{ resource.service.name = \"client-application\" }", "queryType": "traceql", "refId": "A"}],
+      "options": {"showSearch": true, "traceId": ""}
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["devo-carre", "frontend", "faro", "rum"],
+  "templating": {"list": []},
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Devo Carre / Frontend UX",
+  "uid": "devo-carre-frontend",
+  "version": 1
+}

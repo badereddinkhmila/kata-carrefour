@@ -47,6 +47,16 @@ spec:
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: {{ .Values.backend.springProfile | quote }}
+            - name: DEPLOYMENT_ENVIRONMENT
+              value: {{ .Values.backend.observability.environment | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: devo-carre
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: {{ printf "service.namespace=devoteam,deployment.environment=%s" .Values.backend.observability.environment | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.backend.observability.otlpEndpoint | quote }}
+            - name: MANAGEMENT_OPENTELEMETRY_TRACING_EXPORT_OTLP_ENDPOINT
+              value: {{ printf "%s/v1/traces" .Values.backend.observability.otlpEndpoint | quote }}
             - name: DB_URL
               value: {{ printf "jdbc:postgresql://%s:%v/%s" .Values.backend.database.host .Values.backend.database.port .Values.backend.database.name | quote }}
             - name: DB_USERNAME

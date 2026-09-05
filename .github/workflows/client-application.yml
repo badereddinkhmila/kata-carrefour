@@ -1,0 +1,143 @@
+name: Client Application CI/CD
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "client-application/src/**"
+      - "client-application/public/**"
+      - "client-application/package.json"
+      - "client-application/bun.lock"
+      - "client-application/index.html"
+      - "client-application/tsconfig*.json"
+      - "client-application/vite.config.*"
+      - "client-application/vitest.config.*"
+      - "client-application/eslint.config.*"
+      - "client-application/Dockerfile"
+      - "client-application/Containerfile"
+      - "client-application/default.conf.template"
+      - "client-application/.dockerignore"
+      - ".github/workflows/client-application.yml"
+  push:
+    branches: [main]
+    paths:
+      - "client-application/src/**"
+      - "client-application/public/**"
+      - "client-application/package.json"
+      - "client-application/bun.lock"
+      - "client-application/index.html"
+      - "client-application/tsconfig*.json"
+      - "client-application/vite.config.*"
+      - "client-application/vitest.config.*"
+      - "client-application/eslint.config.*"
+      - "client-application/Dockerfile"
+      - "client-application/Containerfile"
+      - "client-application/default.conf.template"
+      - "client-application/.dockerignore"
+      - ".github/workflows/client-application.yml"
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: ghcr.io/badereddinkhmila/kata-carrefour-client
+
+jobs:
+  verify:
+    name: Verify client
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: client-application
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.18"
+
+      - name: Cache Bun downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('client-application/bun.lock') }}
+          restore-keys: bun-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Test
+        run: bun run test
+
+      - name: Build production bundle
+        run: bun run build
+
+      - name: Upload production bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: client-application-dist
+          path: client-application/dist
+          if-no-files-found: ignore
+
+  container:
+    name: Build and publish client image
+    needs: verify
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: gitops-image-updates
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./client-application
+          file: ./client-application/Dockerfile
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+
+      - name: Update the Argo CD image revision
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE_TAG: sha-${{ github.sha }}
+        run: |
+          git checkout main
+          git pull --ff-only origin main
+          sed -i -E 's|value: "sha-[^"]*"|value: "'"$IMAGE_TAG"'"|' argocd/applications/client-application.yaml
+          git diff --exit-code || {
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add argocd/applications/client-application.yaml
+            git commit -m "chore(gitops): deploy client ${IMAGE_TAG}"
+            git push origin HEAD:main
+          }

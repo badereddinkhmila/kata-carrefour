@@ -2,6 +2,7 @@ import axios, { type InternalAxiosRequestConfig } from "axios";
 import { API_BASE_URL } from "@/lib/constants";
 import { useAuthStore } from "@/stores/auth-store";
 import { authResponseSchema } from "@/schemas";
+import { recordApiFailure } from "@/lib/frontend-observability";
 
 export const authClient = axios.create({
   baseURL: API_BASE_URL,
@@ -50,6 +51,12 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+
+    recordApiFailure(
+      originalRequest?.method,
+      originalRequest?.url,
+      error.response?.status,
+    );
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {

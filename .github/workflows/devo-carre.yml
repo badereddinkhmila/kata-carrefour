@@ -1,0 +1,118 @@
+name: Devo Carre Backend CI/CD
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "devo_carre/src/**"
+      - "devo_carre/.mvn/**"
+      - "devo_carre/mvnw"
+      - "devo_carre/pom.xml"
+      - "devo_carre/Dockerfile"
+      - "devo_carre/Containerfile"
+      - "devo_carre/.dockerignore"
+      - ".github/workflows/devo-carre.yml"
+  push:
+    branches: [main]
+    paths:
+      - "devo_carre/src/**"
+      - "devo_carre/.mvn/**"
+      - "devo_carre/mvnw"
+      - "devo_carre/pom.xml"
+      - "devo_carre/Dockerfile"
+      - "devo_carre/Containerfile"
+      - "devo_carre/.dockerignore"
+      - ".github/workflows/devo-carre.yml"
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: ghcr.io/badereddinkhmila/kata-carrefour-backend
+
+jobs:
+  verify:
+    name: Verify backend
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: devo_carre
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: devo_carre/pom.xml
+
+      - name: Run unit and integration tests
+        run: ./mvnw -B -ntp verify
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: devo-carre-test-reports
+          path: devo_carre/target/surefire-reports
+          if-no-files-found: ignore
+
+  container:
+    name: Build and publish backend image
+    needs: verify
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: gitops-image-updates
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./devo_carre
+          file: ./devo_carre/Dockerfile
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: |
+            ${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+
+      - name: Update the Argo CD image revision
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          IMAGE_TAG: sha-${{ github.sha }}
+        run: |
+          git checkout main
+          git pull --ff-only origin main
+          sed -i -E 's|value: "sha-[^"]*"|value: "'"$IMAGE_TAG"'"|' argocd/applications/devo-carre-backend.yaml
+          git diff --exit-code || {
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add argocd/applications/devo-carre-backend.yaml
+            git commit -m "chore(gitops): deploy backend ${IMAGE_TAG}"
+            git push origin HEAD:main
+          }

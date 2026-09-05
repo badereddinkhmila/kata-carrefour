@@ -19,6 +19,9 @@ public class SeatEntity {
     @Column(name = "room_id", nullable = false)
     private UUID roomId;
 
+    @Column(nullable = false, columnDefinition = "integer default 1")
+    private Integer capacity = 1;
+
     @ManyToOne
     @JoinColumn(name = "room_id", nullable = false, insertable = false, updatable = false)
     private RoomEntity room;

@@ -38,6 +38,10 @@ ingress:
 
 resources: {}
 
+observability:
+  faroCollectorUpstream: alloy.devo-carre-observability.svc.cluster.local:12347
+  faroDnsResolver: kube-dns.kube-system.svc.cluster.local
+
 livenessProbe:
   httpGet:
     path: /

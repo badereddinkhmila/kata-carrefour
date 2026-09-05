@@ -9,6 +9,7 @@ function getStoredTheme(): "light" | "dark" | "system" {
     const theme = data.theme ?? data.state?.theme ?? "system";
     if (theme === "light" || theme === "dark" || theme === "system") return theme;
   } catch {
+    // Ignore malformed persisted theme values and retain the system default.
   }
   return "system";
 }

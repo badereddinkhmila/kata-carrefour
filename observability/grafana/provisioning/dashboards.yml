@@ -1,0 +1,13 @@
+apiVersion: 1
+
+providers:
+  - name: devo-carre
+    orgId: 1
+    folder: Devo Carre
+    folderUid: devo-carre
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: false
+    options:
+      path: /opt/grafana-dashboards

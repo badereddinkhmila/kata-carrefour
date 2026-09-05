@@ -1,1 +1,36 @@
-dc-client-0.1.0.tgz
+# Operating system and generated release artifacts
+.DS_Store
+**/.DS_Store
+*.tgz
+
+# Local application configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.jks
+*.key
+
+# Terraform state, plans, provider downloads, and local overrides
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Vagrant provider metadata is machine-specific.
+**/.vagrant/
+
+# Nomad and observability local overrides can contain credentials.
+nomad/variables.local.hcl
+nomad/vm/variables.local.hcl
+observability/nomad/variables.local.hcl

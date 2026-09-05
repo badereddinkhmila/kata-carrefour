@@ -61,6 +61,9 @@ affinity: {}
 
 backend:
   springProfile: dev
+  observability:
+    environment: kubernetes
+    otlpEndpoint: http://otel-collector.devo-carre-observability.svc.cluster.local:4318
   database:
     host: postgres
     port: 5432

@@ -1,0 +1,39 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devo-carre-backend
+  namespace: argocd
+spec:
+  project: devo-carre-local
+  source:
+    repoURL: https://github.com/badereddinkhmila/kata-carrefour.git
+    targetRevision: main
+    path: devo_carre/charts
+    helm:
+      releaseName: dc-backend
+      parameters:
+        - name: image.repository
+          value: ghcr.io/badereddinkhmila/kata-carrefour-backend
+        - name: image.tag
+          value: "sha-bootstrap"
+        - name: image.pullPolicy
+          value: Always
+        - name: backend.database.host
+          value: postgres
+        - name: backend.database.name
+          value: devoteam
+        - name: backend.database.user
+          value: devoteam
+        - name: backend.database.password
+          value: devoteam
+        - name: seed.enabled
+          value: "false"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: devoteam
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

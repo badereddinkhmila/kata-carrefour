@@ -57,11 +57,35 @@ logging:
   level:
     root: INFO
     com.test.devo_carre: INFO
-  pattern:
-    level: "%5p [rid:%X{requestId:-}]"
+  structured:
+    format:
+      console: ${LOG_CONSOLE_FORMAT:logstash}
+    json:
+      add:
+        service: ${spring.application.name}
+        environment: ${DEPLOYMENT_ENVIRONMENT:dev}
+        nomad_alloc_id: ${NOMAD_ALLOC_ID:local}
 
 management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
   endpoint.health.probes.enabled: true
   health:
     livenessState.enabled: true
     readinessState.enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${DEPLOYMENT_ENVIRONMENT:dev}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  tracing:
+    sampling:
+      probability: ${TRACING_SAMPLING_PROBABILITY:1.0}

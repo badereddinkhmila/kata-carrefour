@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: client-application
+  namespace: argocd
+spec:
+  project: devo-carre-local
+  source:
+    repoURL: https://github.com/badereddinkhmila/kata-carrefour.git
+    targetRevision: main
+    path: client-application/charts
+    helm:
+      releaseName: dc-client
+      parameters:
+        - name: image.repository
+          value: ghcr.io/badereddinkhmila/kata-carrefour-client
+        - name: image.tag
+          value: "sha-bootstrap"
+        - name: image.pullPolicy
+          value: Always
+        - name: observability.faroCollectorUpstream
+          value: alloy.devo-carre-observability.svc.cluster.local:12347
+        - name: observability.faroDnsResolver
+          value: kube-dns.kube-system.svc.cluster.local
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: devoteam
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -82,7 +82,7 @@ public class SeedDataService {
 
     private void seedSeats(UUID roomId, String prefix, int capacity) {
         for (int i = 1; i <= capacity; i++) {
-            seatRepository.save(new Seat(null, roomId, prefix + i, null));
+            seatRepository.save(new Seat(null, roomId, prefix + i, 1, null));
         }
     }
 }

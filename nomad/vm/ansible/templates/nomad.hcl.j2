@@ -1,0 +1,98 @@
+data_dir = "{{ nomad_data_dir }}"
+bind_addr = "0.0.0.0"
+
+server {
+  enabled          = true
+  bootstrap_expect = 1
+}
+
+telemetry {
+  prometheus_metrics          = true
+  publish_allocation_metrics  = true
+  disable_hostname            = true
+}
+
+client {
+  enabled  = true
+  cni_path = "/opt/cni/bin"
+
+  host_network "loopback" {
+    interface = "lo"
+  }
+
+  # This bridge address is reachable from CNI allocation namespaces but not
+  # exposed on the VM's external network interface.
+  host_network "nomad-bridge" {
+    interface = "nomad"
+  }
+
+  host_volume "timescaledb-data" {
+    path      = "{{ nomad_volume_dir }}"
+    read_only = false
+  }
+
+  host_volume "nomad-allocation-logs" {
+    path      = "{{ nomad_data_dir }}/alloc"
+    read_only = true
+  }
+
+  host_volume "prometheus-data" {
+    path      = "{{ nomad_observability_dir }}/prometheus"
+    read_only = false
+  }
+
+  host_volume "loki-data" {
+    path      = "{{ nomad_observability_dir }}/loki"
+    read_only = false
+  }
+
+  host_volume "tempo-data" {
+    path      = "{{ nomad_observability_dir }}/tempo"
+    read_only = false
+  }
+
+  host_volume "grafana-data" {
+    path      = "{{ nomad_observability_dir }}/grafana"
+    read_only = false
+  }
+
+  host_volume "grafana-provisioning" {
+    path      = "{{ nomad_observability_dir }}/grafana-provisioning"
+    read_only = true
+  }
+
+  host_volume "grafana-dashboards" {
+    path      = "{{ nomad_observability_dir }}/grafana-dashboards"
+    read_only = true
+  }
+
+  host_volume "alertmanager-data" {
+    path      = "{{ nomad_observability_dir }}/alertmanager"
+    read_only = false
+  }
+
+  host_volume "host-proc" {
+    path      = "/proc"
+    read_only = true
+  }
+
+  host_volume "host-run" {
+    path      = "/var/run"
+    read_only = true
+  }
+
+  host_volume "host-sys" {
+    path      = "/sys"
+    read_only = true
+  }
+
+  host_volume "docker-data" {
+    path      = "/var/lib/docker"
+    read_only = true
+  }
+
+  host_volume "node-exporter-textfile" {
+    path      = "{{ nomad_observability_dir }}/node-exporter-textfile"
+    read_only = true
+  }
+}

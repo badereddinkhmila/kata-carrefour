@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: devo-carre-observability
+
+resources:
+  - k8s/namespace.yaml
+  - k8s/rbac.yaml
+  - k8s/stack.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - k8s/config/prometheus.yml
+      - k8s/config/alerts.yml
+  - name: alertmanager-config
+    files:
+      - k8s/config/alertmanager.yml
+  - name: loki-config
+    files:
+      - k8s/config/loki.yml
+  - name: tempo-config
+    files:
+      - k8s/config/tempo.yml
+  - name: otel-collector-config
+    files:
+      - k8s/config/otel-collector.yml
+  - name: alloy-config
+    files:
+      - k8s/config/alloy.alloy
+  - name: grafana-datasources
+    files:
+      - k8s/config/grafana-datasources.yml
+  - name: grafana-dashboard-provisioning
+    files:
+      - grafana/provisioning/dashboards.yml
+  - name: grafana-dashboards
+    files:
+      - grafana/dashboards/devo-carre-overview.json
+      - grafana/dashboards/devo-carre-platform.json
+      - grafana/dashboards/devo-carre-reservations.json
+      - grafana/dashboards/devo-carre-database.json
+      - grafana/dashboards/devo-carre-nomad.json
+      - grafana/dashboards/devo-carre-frontend.json
+      - k8s/dashboards/devo-carre-kubernetes.json

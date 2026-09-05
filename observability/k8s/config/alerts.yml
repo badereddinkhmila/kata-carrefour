@@ -1,0 +1,42 @@
+groups:
+  - name: devo-carre-kubernetes
+    rules:
+      - alert: DevoCarreBackendDown
+        expr: up{job="devo-carre-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: Devo Carre backend is unavailable
+
+      - alert: DevoCarreDatabaseExporterDown
+        expr: up{job="postgres-exporter"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: PostgreSQL exporter is unavailable
+
+      - alert: DevoCarreKubernetesNodeNotReady
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Kubernetes node is not ready
+
+      - alert: DevoCarreHighHttpErrorRate
+        expr: 100 * sum(rate(http_server_requests_seconds_count{job="devo-carre-backend",uri!~"/actuator.*",status=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count{job="devo-carre-backend",uri!~"/actuator.*"}[5m])), 0.001) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Backend 5xx rate exceeds 5 percent
+
+      - alert: DevoCarreHighP95Latency
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="devo-carre-backend",uri!~"/actuator.*"}[5m]))) > 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Backend p95 latency exceeds one second

@@ -20,7 +20,7 @@ class ReservationPolicyTest {
 
     @Test
     void ensureSeatExists_whenPresent_doesNotThrow() {
-        var seat = new Seat(UUID.randomUUID(), UUID.randomUUID(), "A1", 1L);
+        var seat = new Seat(UUID.randomUUID(), UUID.randomUUID(), "A1", 1, 1L);
         reservationPolicy.ensureSeatExists(seat);
     }
 }

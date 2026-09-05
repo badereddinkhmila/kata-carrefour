@@ -203,8 +203,9 @@ make kind-bootstrap
 This command will:
 - Create a kind cluster (`devoteam-local`)
 - Build and load backend/client Docker images into kind
-- Deploy PostgreSQL in namespace `devoteam`
+- Deploy TimescaleDB with `pg_stat_statements` in namespace `devoteam`
 - Install/upgrade backend and client Helm releases
+- Deploy Prometheus, Grafana, Loki, Tempo, the OpenTelemetry Collector, Alloy/Faro, Alertmanager, `postgres_exporter`, `node_exporter`, kube-state-metrics, Kubernetes cAdvisor scraping, alerts, and provisioned dashboards in namespace `devo-carre-observability`
 
 Expose postgres/frontend/backend to localhost:
 
@@ -225,4 +226,113 @@ Useful related commands:
 - `make helm-package`
 - `make helm-push HELM_OCI_REPO=oci://<registry>/<repo>`
 
+### Kubernetes Observability
+
+The Kubernetes implementation mirrors the VM LGTM stack using Kubernetes-native
+service discovery and RBAC. The browser posts Faro telemetry to the client
+Service's `/collect` path; Nginx forwards it to the internal Alloy Service.
+
+For an existing kind cluster, rebuild/load the portable client image, upgrade
+the application charts, then deploy monitoring:
+
+```bash
+make kind-load-images
+make k8s-deploy
+make k8s-observability-deploy
+```
+
+Expose the observability UIs in a second terminal:
+
+```bash
+make k8s-observability-port-forward
+```
+
+| Service | Address | Credentials |
+| --- | --- | --- |
+| Grafana | `http://localhost:3000` | `admin` / `admin` |
+| Prometheus | `http://localhost:9090` | none |
+| Loki API | `http://localhost:3100` | none |
+| Tempo API | `http://localhost:3200` | none |
+| Alertmanager | `http://localhost:9093` | none |
+
+Grafana provisions the existing application dashboards plus `Devo Carre /
+Kubernetes Platform` at `http://localhost:3000/d/devo-carre-kubernetes`.
+
 If `make kind-bootstrap` stalls while waiting for PostgreSQL, the updated make flow now re-enables scheduling on local kind nodes before waiting and prints node/pod status if PostgreSQL still cannot become available.
+
+## Nomad (Linux VM)
+
+The primary Nomad workflow provisions a Linux VM with Vagrant and Ansible, then runs TimescaleDB, the Spring Boot backend, and the React frontend through Nomad inside that VM:
+
+```bash
+make vm-nomad-up
+make vm-nomad-deploy
+make vm-nomad-status
+```
+
+Open the SSH tunnel in a terminal that remains open:
+
+```bash
+make vm-nomad-port-forward
+```
+
+The tunnel exposes the deployed services on the host:
+
+- Frontend: http://localhost:4200
+- Backend API: http://localhost:8080
+- TimescaleDB: `localhost:5432`
+- Nomad UI: http://localhost:4646
+
+Run a Spring CLI command against the VM's deployed TimescaleDB:
+
+```bash
+make vm-nomad-cli NOMAD_VM_CLI_COMMAND='seed-data'
+```
+
+Stop every deployment in the VM while retaining the VM and persistent
+application and observability data:
+
+```bash
+make vm-nomad-stop-all
+```
+
+The VM stays running until explicitly halted or destroyed. To stop it without
+deleting its disk or data, run `make vm-nomad-halt`; resume it with `make
+vm-nomad-start`. If Nomad jobs have not been purged, service jobs resume after
+the VM starts.
+
+See [nomad/vm/README.md](nomad/vm/README.md) for provider requirements, provisioning details, and VM lifecycle commands. The files directly under `nomad/` are retained as the earlier native-macOS experiment; use the VM workflow for the production-like environment.
+
+## Observability (VM Nomad)
+
+Deploy Grafana, Prometheus, Loki, Tempo, an OpenTelemetry Collector, and Grafana Alloy in the VM:
+
+```bash
+make vm-observability-deploy
+make vm-nomad-deploy
+make vm-observability-port-forward
+```
+
+See [observability/README.md](observability/README.md) for architecture, addresses, credentials, and the local security boundary.
+
+## GitHub Actions And Argo CD
+
+The backend and client have separate path-scoped GitHub Actions pipelines. Pull
+requests verify only the changed application; qualifying pushes to GitHub's
+`main` branch publish immutable GHCR images and update the matching Argo CD
+Application image tag. Argo CD, rather than GitHub Actions, deploys that Git
+revision to Kubernetes.
+
+For the local learning flow, complete the GitHub permissions and GHCR package
+visibility setup, then run:
+
+```bash
+make kind-gitops-bootstrap
+make k8s-argocd-port-forward
+make k8s-argocd-initial-password
+```
+
+Open `https://localhost:8081` and sign in as `admin`. Do not combine this
+GitOps workflow with `make k8s-deploy` or `make k8s-observability-deploy` for
+the same cluster resources. See [argocd/README.md](argocd/README.md) for the
+full setup, delivery flow, and troubleshooting steps.

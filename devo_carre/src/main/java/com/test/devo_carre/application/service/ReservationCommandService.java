@@ -40,63 +40,73 @@ public class ReservationCommandService implements ReserveSeatUseCase, ConfirmRes
     private final ReservationRepository reservationRepository;
     private final RoomUpdatePublisher roomUpdatePublisher;
     private final ClockPort clockPort;
+    private final ReservationMetrics reservationMetrics;
     private final ReservationPolicy reservationPolicy = new ReservationPolicy();
 
     public ReservationCommandService(EventRepository eventRepository,
                                      SeatRepository seatRepository,
                                      ReservationRepository reservationRepository,
                                      RoomUpdatePublisher roomUpdatePublisher,
-                                     ClockPort clockPort) {
+                                     ClockPort clockPort,
+                                     ReservationMetrics reservationMetrics) {
         this.eventRepository = eventRepository;
         this.seatRepository = seatRepository;
         this.reservationRepository = reservationRepository;
         this.roomUpdatePublisher = roomUpdatePublisher;
         this.clockPort = clockPort;
+        this.reservationMetrics = reservationMetrics;
     }
 
     @Override
     @Transactional
     public ReservationView reserve(UUID eventId, UUID seatId, UUID userId) {
-        log.info("Reserve request eventId={} seatId={} userId={}", eventId, seatId, userId);
-        var event = eventRepository.findById(eventId)
-                .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
+        reservationMetrics.recordAttempt("reserve");
+        try {
+            log.info("Reserve request eventId={} seatId={} userId={}", eventId, seatId, userId);
+            var event = eventRepository.findById(eventId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Event not found"));
 
-        var now = clockPort.now();
-        if (event.startsAt() != null && event.startsAt().isBefore(now)) {
-            throw new IllegalStateException("Event has already started");
+            var now = clockPort.now();
+            if (event.startsAt() != null && event.startsAt().isBefore(now)) {
+                throw new IllegalStateException("Event has already started");
+            }
+
+            var seat = seatRepository.findById(seatId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Seat not found"));
+
+            if (!seat.roomId().equals(event.roomId())) {
+                throw new IllegalArgumentException("Seat does not belong to event room");
+            }
+
+            reservationPolicy.ensureSeatExists(seat);
+
+            if (reservationRepository.findActiveByEventIdAndSeatId(eventId, seatId, now).isPresent()) {
+                log.warn("Reserve rejected seat already reserved eventId={} seatId={} userId={}", eventId, seatId, userId);
+                throw new IllegalStateException("Seat is already reserved");
+            }
+
+            var reservation = new Reservation(
+                    null,
+                    eventId,
+                    seatId,
+                    userId,
+                    ReservationStatus.PENDING,
+                    now,
+                    null,
+                    now.plus(RESERVATION_TTL),
+                    null
+            );
+
+            var saved = reservationRepository.save(reservation);
+            log.info("Seat reserved reservationId={} eventId={} seatId={} userId={} expiresAt={}",
+                    saved.id(), saved.eventId(), saved.seatId(), saved.userId(), saved.expiresAt());
+            publishAfterCommit(toRoomUpdate(new RoomChangeEvent.SeatReservedEvent(eventId, seatId, saved.id(), now), saved.expiresAt()));
+            reservationMetrics.recordSuccess("reserve");
+            return toView(saved);
+        } catch (RuntimeException exception) {
+            reservationMetrics.recordFailure("reserve", exception);
+            throw exception;
         }
-
-        var seat = seatRepository.findById(seatId)
-                .orElseThrow(() -> new ResourceNotFoundException("Seat not found"));
-
-        if (!seat.roomId().equals(event.roomId())) {
-            throw new IllegalArgumentException("Seat does not belong to event room");
-        }
-
-        reservationPolicy.ensureSeatExists(seat);
-
-        if (reservationRepository.findActiveByEventIdAndSeatId(eventId, seatId, now).isPresent()) {
-            log.warn("Reserve rejected seat already reserved eventId={} seatId={} userId={}", eventId, seatId, userId);
-            throw new IllegalStateException("Seat is already reserved");
-        }
-
-        var reservation = new Reservation(
-                null,
-                eventId,
-                seatId,
-                userId,
-                ReservationStatus.PENDING,
-                now,
-                null,
-                now.plus(RESERVATION_TTL),
-                null
-        );
-
-        var saved = reservationRepository.save(reservation);
-        log.info("Seat reserved reservationId={} eventId={} seatId={} userId={} expiresAt={}",
-                saved.id(), saved.eventId(), saved.seatId(), saved.userId(), saved.expiresAt());
-        publishAfterCommit(toRoomUpdate(new RoomChangeEvent.SeatReservedEvent(eventId, seatId, saved.id(), now), saved.expiresAt()));
-        return toView(saved);
     }
 
     @Override
@@ -113,24 +123,31 @@ public class ReservationCommandService implements ReserveSeatUseCase, ConfirmRes
     @Override
     @Transactional
     public ReservationView confirm(UUID reservationId, UUID userId) {
-        log.info("Confirm request reservationId={} userId={}", reservationId, userId);
-        var reservation = reservationRepository.findById(reservationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Reservation not found"));
+        reservationMetrics.recordAttempt("confirm");
+        try {
+            log.info("Confirm request reservationId={} userId={}", reservationId, userId);
+            var reservation = reservationRepository.findById(reservationId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Reservation not found"));
 
-        if (!reservation.userId().equals(userId)) {
-            log.warn("Confirm rejected ownership mismatch reservationId={} ownerUserId={} requestUserId={}",
-                    reservationId, reservation.userId(), userId);
-            throw new IllegalArgumentException("Reservation does not belong to user");
+            if (!reservation.userId().equals(userId)) {
+                log.warn("Confirm rejected ownership mismatch reservationId={} ownerUserId={} requestUserId={}",
+                        reservationId, reservation.userId(), userId);
+                throw new IllegalArgumentException("Reservation does not belong to user");
+            }
+
+            var confirmed = reservation.confirm(clockPort.now());
+            var saved = reservationRepository.save(confirmed);
+            log.info("Reservation confirmed reservationId={} eventId={} seatId={} userId={}",
+                    saved.id(), saved.eventId(), saved.seatId(), saved.userId());
+            publishAfterCommit(toRoomUpdate(new RoomChangeEvent.ReservationConfirmedEvent(
+                    saved.eventId(), saved.seatId(), saved.id(), clockPort.now()
+            ), null));
+            reservationMetrics.recordSuccess("confirm");
+            return toView(saved);
+        } catch (RuntimeException exception) {
+            reservationMetrics.recordFailure("confirm", exception);
+            throw exception;
         }
-
-        var confirmed = reservation.confirm(clockPort.now());
-        var saved = reservationRepository.save(confirmed);
-        log.info("Reservation confirmed reservationId={} eventId={} seatId={} userId={}",
-                saved.id(), saved.eventId(), saved.seatId(), saved.userId());
-        publishAfterCommit(toRoomUpdate(new RoomChangeEvent.ReservationConfirmedEvent(
-                saved.eventId(), saved.seatId(), saved.id(), clockPort.now()
-        ), null));
-        return toView(saved);
     }
 
     @Override
@@ -164,17 +181,24 @@ public class ReservationCommandService implements ReserveSeatUseCase, ConfirmRes
         var now = clockPort.now();
 
         for (var seatId : seatIds) {
-            var reservation = reservationRepository.findActiveByEventIdAndSeatIdAndUserId(eventId, seatId, userId, now)
-                    .orElseThrow(() -> new ResourceNotFoundException("Reservation not found for seat " + seatId));
+            reservationMetrics.recordAttempt("cancel");
+            try {
+                var reservation = reservationRepository.findActiveByEventIdAndSeatIdAndUserId(eventId, seatId, userId, now)
+                        .orElseThrow(() -> new ResourceNotFoundException("Reservation not found for seat " + seatId));
 
-            var updatedReservation = reservation.cancel();
-            var saved = reservationRepository.save(updatedReservation);
-            log.info("Reservation cancelled reservationId={} eventId={} seatId={} userId={}",
-                    saved.id(), saved.eventId(), saved.seatId(), saved.userId());
-            publishAfterCommit(toRoomUpdate(new RoomChangeEvent.ReservationCancelledEvent(
-                    saved.eventId(), saved.seatId(), saved.id(), clockPort.now()
-            ), null));
-            cancelled.add(toView(saved));
+                var updatedReservation = reservation.cancel();
+                var saved = reservationRepository.save(updatedReservation);
+                log.info("Reservation cancelled reservationId={} eventId={} seatId={} userId={}",
+                        saved.id(), saved.eventId(), saved.seatId(), saved.userId());
+                publishAfterCommit(toRoomUpdate(new RoomChangeEvent.ReservationCancelledEvent(
+                        saved.eventId(), saved.seatId(), saved.id(), clockPort.now()
+                ), null));
+                reservationMetrics.recordSuccess("cancel");
+                cancelled.add(toView(saved));
+            } catch (RuntimeException exception) {
+                reservationMetrics.recordFailure("cancel", exception);
+                throw exception;
+            }
         }
 
         return cancelled;
@@ -188,6 +212,7 @@ public class ReservationCommandService implements ReserveSeatUseCase, ConfirmRes
         for (var reservation : reservationRepository.findPendingExpired(now)) {
             var expired = reservation.expire();
             reservationRepository.save(expired);
+            reservationMetrics.recordSuccess("expire");
             log.info("Reservation expired reservationId={} eventId={} seatId={} userId={}",
                     expired.id(), expired.eventId(), expired.seatId(), expired.userId());
 

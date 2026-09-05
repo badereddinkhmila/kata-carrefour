@@ -1,6 +1,7 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@iconify/react";
+import { recordFrontendError } from "@/lib/frontend-observability";
 
 type Props = { children: ReactNode };
 type State = { hasError: boolean; error?: Error };
@@ -14,6 +15,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
     console.error("Error boundary caught:", error, errorInfo);
+    recordFrontendError(error, "react_error_boundary");
   }
 
   render(): ReactNode {

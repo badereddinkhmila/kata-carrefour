@@ -1,50 +1,34 @@
-########################################
-# 🔧 VARIABLES
-########################################
-
-variable "postgres_image" {
+variable "timescaledb_image" {
   type    = string
-  default = "postgres:18.1-bookworm"
+  default = "timescale/timescaledb:2.24.0-pg17"
 }
 
 variable "backend_image" {
-  type    = string
+  type = string
 }
 
 variable "client_image" {
-  type    = string
+  type = string
 }
 
 variable "db_name" {
   type    = string
+  default = "devoteam"
 }
 
 variable "db_user" {
   type    = string
+  default = "devoteam"
 }
 
 variable "db_password" {
-  type    = string
+  type = string
 }
 
 variable "spring_profile" {
   type    = string
   default = "dev"
 }
-
-# Host the backend uses to reach Postgres. Docker Desktop exposes published ports
-# on host.docker.internal. Do not use Docker network_mode = "group": Docker treats
-# "group" as a network name and errors with "network group not found". For Linux
-# + Nomad bridge (CNI) with a shared alloc namespace, set this to 127.0.0.1 and
-# use network { mode = "bridge" } with no per-task network_mode.
-variable "db_connect_host" {
-  type    = string
-  default = "host.docker.internal"
-}
-
-########################################
-# 🚀 JOB
-########################################
 
 job "devoteam-carrefour" {
   datacenters = ["dc1"]
@@ -60,38 +44,63 @@ job "devoteam-carrefour" {
       mode     = "delay"
     }
 
+    # Docker Desktop on macOS does not provide Nomad's Linux CNI bridge mode.
+    # Tasks join the devoteam-nomad Docker network, where TimescaleDB is
+    # discoverable through its network alias, "timescaledb".
     network {
       port "db" {
-        static = 5432
+        static       = 5432
+        to           = 5432
+        host_network = "loopback"
       }
+
       port "backend" {
-        static = 8080
+        static       = 8080
+        to           = 8080
+        host_network = "loopback"
       }
+
       port "http" {
-        static = 4200
+        static       = 4200
+        to           = 80
+        host_network = "loopback"
       }
     }
 
-    volume "pgdata" {
+    volume "timescaledb_data" {
       type      = "host"
+      source    = "timescaledb-data"
       read_only = false
-      source    = "pgdata"
     }
 
-    task "postgres" {
+    task "timescaledb" {
       driver = "docker"
 
-      volume_mount {
-        volume      = "pgdata"
-        destination = "/var/lib/postgresql/data"
-        read_only   = false
+      # Docker runs this script only on first database initialization.
+      template {
+        destination = "local/001-enable-timescaledb.sql"
+        change_mode = "noop"
+        data        = <<-SQL
+          CREATE EXTENSION IF NOT EXISTS timescaledb;
+          SQL
       }
 
       config {
-        image                = var.postgres_image
-        ports                = ["db"]
-        force_pull           = false
-        image_pull_timeout   = "0s"
+        image              = var.timescaledb_image
+        ports              = ["db"]
+        force_pull         = false
+        image_pull_timeout = "0s"
+        network_mode       = "devoteam-nomad"
+        network_aliases    = ["timescaledb"]
+        volumes = [
+          "local/001-enable-timescaledb.sql:/docker-entrypoint-initdb.d/001-enable-timescaledb.sql:ro",
+        ]
+      }
+
+      volume_mount {
+        volume      = "timescaledb_data"
+        destination = "/var/lib/postgresql/data"
+        read_only   = false
       }
 
       env {
@@ -102,16 +111,16 @@ job "devoteam-carrefour" {
 
       resources {
         cpu    = 500
-        memory = 512
+        memory = 1024
       }
 
       service {
-        name = "postgres"
-        port = "db"
+        name     = "timescaledb"
+        port     = "db"
         provider = "nomad"
 
         check {
-          name     = "postgres-alive"
+          name     = "timescaledb-ready"
           type     = "tcp"
           interval = "10s"
           timeout  = "2s"
@@ -123,14 +132,15 @@ job "devoteam-carrefour" {
       driver = "docker"
 
       config {
-        image                = var.backend_image
-        ports                = ["backend"]
-        force_pull           = false
-        image_pull_timeout   = "0s"
+        image              = var.backend_image
+        ports              = ["backend"]
+        force_pull         = false
+        image_pull_timeout = "0s"
+        network_mode       = "devoteam-nomad"
       }
 
       env {
-        DB_URL                 = "jdbc:postgresql://${var.db_connect_host}:5432/${var.db_name}"
+        DB_URL                 = "jdbc:postgresql://timescaledb:5432/${var.db_name}"
         DB_USERNAME            = var.db_user
         DB_PASSWORD            = var.db_password
         SPRING_PROFILES_ACTIVE = var.spring_profile
@@ -142,13 +152,13 @@ job "devoteam-carrefour" {
       }
 
       service {
-        name = "backend"
-        port = "backend"
+        name     = "devo-carre-backend"
+        port     = "backend"
         provider = "nomad"
 
         check {
-          type     = "http"
-          path     = "/actuator/health"
+          name     = "backend-ready"
+          type     = "tcp"
           interval = "10s"
           timeout  = "2s"
         }
@@ -159,17 +169,11 @@ job "devoteam-carrefour" {
       driver = "docker"
 
       config {
-        image                = var.client_image
-        ports                = ["http"]
-        force_pull           = false
-        image_pull_timeout   = "0s"
-        port_map {
-          http = 80
-        }
-      }
-
-      env {
-        API_URL = "http://127.0.0.1:8080"
+        image              = var.client_image
+        ports              = ["http"]
+        force_pull         = false
+        image_pull_timeout = "0s"
+        network_mode       = "devoteam-nomad"
       }
 
       resources {
@@ -178,11 +182,12 @@ job "devoteam-carrefour" {
       }
 
       service {
-        name = "client"
-        port = "http"
+        name     = "devo-carre-client"
+        port     = "http"
         provider = "nomad"
 
         check {
+          name     = "client-ready"
           type     = "http"
           path     = "/"
           interval = "10s"

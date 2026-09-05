@@ -12,6 +12,7 @@ import com.test.devo_carre.support.fake.FakeRoomUpdatePublisher;
 import com.test.devo_carre.support.fake.FakeSeatRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 
 import java.time.Instant;
 import java.util.List;
@@ -41,7 +42,8 @@ class ReservationCommandServiceTest {
                 seatRepository,
                 reservationRepository,
                 roomUpdatePublisher,
-                clockPort
+                clockPort,
+                new ReservationMetrics(new SimpleMeterRegistry())
         );
     }
 
@@ -80,7 +82,7 @@ class ReservationCommandServiceTest {
         var roomId = UUID.randomUUID();
         var now = clockPort.now();
         var event = new Event(eventId, "Event", "banner", now.plusSeconds(3600), roomId);
-        var seat = new Seat(seatId, roomId, "A1", 1L);
+        var seat = new Seat(seatId, roomId, "A1", 1, 1L);
 
         eventRepository.save(event);
         seatRepository.save(seat);
@@ -116,7 +118,7 @@ class ReservationCommandServiceTest {
         var roomId = UUID.randomUUID();
         var now = clockPort.now();
         var event = new Event(eventId, "Event", "banner", now.plusSeconds(3600), roomId);
-        var seat = new Seat(seatId, roomId, "A1", 1L);
+        var seat = new Seat(seatId, roomId, "A1", 1, 1L);
 
         eventRepository.save(event);
         seatRepository.save(seat);
@@ -138,7 +140,7 @@ class ReservationCommandServiceTest {
         var roomId = UUID.randomUUID();
         var now = clockPort.now();
         var event = new Event(eventId, "Event", "banner", now.plusSeconds(3600), roomId);
-        var seat = new Seat(seatId, roomId, "A1", 1L);
+        var seat = new Seat(seatId, roomId, "A1", 1, 1L);
 
         eventRepository.save(event);
         seatRepository.save(seat);

@@ -1,0 +1,25 @@
+Vagrant.configure("2") do |config|
+  project_root = File.expand_path("../..", __dir__)
+
+  config.vm.box = ENV.fetch("VAGRANT_BOX", "cloud-image/ubuntu-24.04")
+  config.vm.hostname = "devo-carre-nomad"
+  config.vm.boot_timeout = 600
+
+  # Docker image layers, Prometheus data, and Grafana's LGTM stack do not fit
+  # reliably on the cloud image's default 10 GiB root disk.
+  config.vm.provider "qemu" do |qemu|
+    qemu.disk_resize = ENV.fetch("NOMAD_VM_DISK_SIZE", "32G")
+  end
+
+  # The VM owns the deployment runtime. Rsync keeps the source available for
+  # image builds inside the guest without sharing the host Docker daemon.
+  config.vm.synced_folder project_root, "/workspace",
+    type: "rsync",
+    rsync__exclude: [".git/", "devo_carre/target/", "client-application/node_modules/"]
+
+  # Provision from the macOS Ansible installation. This works with the QEMU
+  # provider, which does not implement Vagrant's generic network provisioner.
+  config.vm.provision "ansible" do |ansible|
+    ansible.playbook = "ansible/playbook.yml"
+  end
+end

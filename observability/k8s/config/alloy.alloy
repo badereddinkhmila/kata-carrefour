@@ -1,0 +1,76 @@
+discovery.kubernetes "pods" {
+  role = "pod"
+
+  namespaces {
+    names = ["devoteam", "devo-carre-observability"]
+  }
+}
+
+discovery.relabel "pod_logs" {
+  targets = discovery.kubernetes.pods.targets
+
+  rule {
+    source_labels = ["__meta_kubernetes_namespace"]
+    target_label  = "namespace"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_name"]
+    target_label  = "pod"
+  }
+
+  rule {
+    source_labels = ["__meta_kubernetes_pod_container_name"]
+    target_label  = "container"
+  }
+
+  rule {
+    target_label = "job"
+    replacement  = "kubernetes-pod"
+  }
+}
+
+loki.source.kubernetes "pods" {
+  targets    = discovery.relabel.pod_logs.output
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki.devo-carre-observability.svc.cluster.local:3100/loki/api/v1/push"
+  }
+
+  external_labels = {
+    environment = "kubernetes",
+    cluster     = "devoteam-local",
+  }
+}
+
+faro.receiver "frontend" {
+  log_format = "json"
+  extra_log_labels = {
+    application = "client-application",
+    environment = "kubernetes",
+    source      = "faro",
+  }
+
+  server {
+    listen_address = "0.0.0.0"
+    listen_port    = 12347
+  }
+
+  sourcemaps {
+    download = false
+  }
+
+  output {
+    logs   = [loki.write.local.receiver]
+    traces = [otelcol.exporter.otlphttp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlphttp "tempo" {
+  client {
+    endpoint = "http://otel-collector.devo-carre-observability.svc.cluster.local:4318"
+  }
+}

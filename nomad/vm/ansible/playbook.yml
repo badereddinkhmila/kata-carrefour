@@ -1,0 +1,202 @@
+---
+- name: Provision the local Linux Nomad server
+  hosts: all
+  become: true
+  vars:
+    cni_plugins_version: "1.6.2"
+    nomad_version: "1.11.3"
+    nomad_arch: "{{ 'arm64' if ansible_architecture in ['aarch64', 'arm64'] else 'amd64' }}"
+    nomad_data_dir: /opt/nomad
+    nomad_volume_dir: /opt/nomad/volumes/timescaledb-data
+    nomad_observability_dir: /opt/nomad/observability
+
+  tasks:
+    - name: Install runtime packages
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - docker-buildx
+          - docker.io
+          - unzip
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Enable Docker
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Expand the root partition after QEMU disk growth
+      ansible.builtin.command: growpart /dev/vda 1
+      register: growpart_result
+      changed_when: "'CHANGED:' in growpart_result.stdout"
+      failed_when: growpart_result.rc != 0 and 'NOCHANGE:' not in growpart_result.stdout
+
+    - name: Expand the root filesystem after QEMU disk growth
+      ansible.builtin.command: resize2fs /dev/vda1
+      register: resize2fs_result
+      changed_when: "'Nothing to do!' not in (resize2fs_result.stdout ~ resize2fs_result.stderr)"
+
+    - name: Allow the Vagrant user to use Docker
+      ansible.builtin.user:
+        name: vagrant
+        groups: docker
+        append: true
+
+    - name: Download Nomad
+      ansible.builtin.get_url:
+        url: "https://releases.hashicorp.com/nomad/{{ nomad_version }}/nomad_{{ nomad_version }}_linux_{{ nomad_arch }}.zip"
+        dest: "/tmp/nomad_{{ nomad_version }}.zip"
+        mode: "0644"
+
+    - name: Install Nomad
+      ansible.builtin.unarchive:
+        src: "/tmp/nomad_{{ nomad_version }}.zip"
+        dest: /usr/local/bin
+        remote_src: true
+        mode: "0755"
+
+    - name: Create the CNI plugin directory
+      ansible.builtin.file:
+        path: /opt/cni/bin
+        state: directory
+        mode: "0755"
+
+    - name: Download CNI plugins
+      ansible.builtin.get_url:
+        url: "https://github.com/containernetworking/plugins/releases/download/v{{ cni_plugins_version }}/cni-plugins-linux-{{ nomad_arch }}-v{{ cni_plugins_version }}.tgz"
+        dest: "/tmp/cni-plugins_{{ cni_plugins_version }}.tgz"
+        mode: "0644"
+
+    - name: Install CNI plugins
+      ansible.builtin.unarchive:
+        src: "/tmp/cni-plugins_{{ cni_plugins_version }}.tgz"
+        dest: /opt/cni/bin
+        remote_src: true
+        creates: /opt/cni/bin/bridge
+
+    - name: Create Nomad configuration and data directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: "0755"
+      loop:
+        - /etc/nomad.d
+        - "{{ nomad_data_dir }}"
+        - "{{ nomad_data_dir }}/alloc"
+        - "{{ nomad_data_dir }}/volumes"
+
+    - name: Create the TimescaleDB host volume
+      ansible.builtin.file:
+        path: "{{ nomad_volume_dir }}"
+        state: directory
+        owner: "999"
+        group: "999"
+        mode: "0750"
+
+    - name: Create the observability base directory
+      ansible.builtin.file:
+        path: "{{ nomad_observability_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Create observability data volumes
+      ansible.builtin.file:
+        path: "{{ nomad_observability_dir }}/{{ item.name }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.group }}"
+        mode: "{{ item.mode | default('0750') }}"
+      loop:
+        - { name: prometheus, owner: '65534', group: '65534' }
+        - { name: loki, owner: '10001', group: '10001' }
+        - { name: tempo, owner: '10001', group: '10001' }
+        - { name: grafana, owner: '472', group: '472' }
+        - { name: alertmanager, owner: '65534', group: '65534' }
+        - { name: node-exporter-textfile, owner: 'root', group: 'root', mode: '0755' }
+
+    - name: Install the VM filesystem metric script
+      ansible.builtin.copy:
+        dest: /usr/local/bin/write-devo-carre-vm-filesystem-metrics
+        owner: root
+        group: root
+        mode: "0755"
+        content: |
+          #!/bin/sh
+          set -eu
+          output=/opt/nomad/observability/node-exporter-textfile/devo_carre_vm_filesystem.prom
+          tmp="${output}.tmp"
+          set -- $(df -PB1 / | awk 'NR == 2 { print $2, $4 }')
+          cat > "$tmp" <<METRICS
+          # HELP devo_carre_vm_root_filesystem_size_bytes Total size of the VM root filesystem.
+          # TYPE devo_carre_vm_root_filesystem_size_bytes gauge
+          devo_carre_vm_root_filesystem_size_bytes $1
+          # HELP devo_carre_vm_root_filesystem_avail_bytes Available space on the VM root filesystem.
+          # TYPE devo_carre_vm_root_filesystem_avail_bytes gauge
+          devo_carre_vm_root_filesystem_avail_bytes $2
+          METRICS
+          mv "$tmp" "$output"
+
+    - name: Update the VM filesystem metric every minute
+      ansible.builtin.cron:
+        name: devo-carre-vm-filesystem-metrics
+        user: root
+        minute: "*"
+        job: /usr/local/bin/write-devo-carre-vm-filesystem-metrics
+
+    - name: Write the initial VM filesystem metric
+      ansible.builtin.command: /usr/local/bin/write-devo-carre-vm-filesystem-metrics
+      changed_when: false
+
+    - name: Install Grafana provisioning configuration
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../../observability/grafana/provisioning/"
+        dest: "{{ nomad_observability_dir }}/grafana-provisioning/"
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install Grafana dashboards
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../../../observability/grafana/dashboards/"
+        dest: "{{ nomad_observability_dir }}/grafana-dashboards/"
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Configure Nomad
+      ansible.builtin.template:
+        src: nomad.hcl.j2
+        dest: /etc/nomad.d/nomad.hcl
+        mode: "0644"
+      notify: Restart Nomad
+
+    - name: Install the Nomad systemd service
+      ansible.builtin.template:
+        src: nomad.service.j2
+        dest: /etc/systemd/system/nomad.service
+        mode: "0644"
+      notify:
+        - Reload systemd
+        - Restart Nomad
+
+    - name: Enable Nomad
+      ansible.builtin.systemd:
+        name: nomad
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Restart Nomad
+      ansible.builtin.systemd:
+        name: nomad
+        state: restarted

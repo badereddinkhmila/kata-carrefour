@@ -1,0 +1,14 @@
+[Unit]
+Description=HashiCorp Nomad
+Documentation=https://developer.hashicorp.com/nomad
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+ExecStart=/usr/local/bin/nomad agent -config=/etc/nomad.d
+Restart=on-failure
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

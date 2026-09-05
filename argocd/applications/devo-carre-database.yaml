@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: devo-carre-database
+  namespace: argocd
+spec:
+  project: devo-carre-local
+  source:
+    repoURL: https://github.com/badereddinkhmila/kata-carrefour.git
+    targetRevision: main
+    path: k8s-local
+    directory:
+      include: postgres.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: devoteam
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,5 +1,5 @@
-data_dir = "/tmp/nomad"
-
+# Single-node Nomad agent configuration for local development.
+data_dir  = "/tmp/devo-carre-nomad"
 bind_addr = "127.0.0.1"
 
 advertise {
@@ -16,16 +16,12 @@ server {
 client {
   enabled = true
 
-  host_volume "pgdata" {
-    path = "/tmp/nomad/pgdata"
+  host_network "loopback" {
+    interface = "lo0"
+  }
+
+  host_volume "timescaledb-data" {
+    path      = "/tmp/devo-carre-nomad/timescaledb-data"
+    read_only = false
   }
 }
-
-# consul {
-#   address = "127.0.0.1:8500"
-
-#   auto_advertise = true
-#   client_auto_join = true
-#   server_service_name = "nomad"
-#   client_service_name = "nomad-client"
-# }

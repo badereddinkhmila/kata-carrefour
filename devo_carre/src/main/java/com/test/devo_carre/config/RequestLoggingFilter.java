@@ -1,16 +1,12 @@
 package com.test.devo_carre.config;
 
-import com.test.devo_carre.security.AuthUserPrincipal;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.Ordered;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -21,12 +17,14 @@ import java.util.UUID;
 @Profile("!cli")
 public class RequestLoggingFilter extends OncePerRequestFilter implements Ordered {
 
+    public static final String REQUEST_ID_ATTRIBUTE = RequestLoggingFilter.class.getName() + ".requestId";
+    public static final String REQUEST_STARTED_AT_ATTRIBUTE = RequestLoggingFilter.class.getName() + ".startedAt";
+
     @Override
     public int getOrder() {
         return Ordered.HIGHEST_PRECEDENCE;
     }
 
-    private static final Logger log = LoggerFactory.getLogger(RequestLoggingFilter.class);
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
     private static final String REQUEST_ID_MDC_KEY = "requestId";
 
@@ -35,27 +33,15 @@ public class RequestLoggingFilter extends OncePerRequestFilter implements Ordere
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         var requestId = resolveRequestId(request);
-        var startedAt = System.nanoTime();
+        request.setAttribute(REQUEST_ID_ATTRIBUTE, requestId);
+        request.setAttribute(REQUEST_STARTED_AT_ATTRIBUTE, System.nanoTime());
         MDC.put(REQUEST_ID_MDC_KEY, requestId);
         response.setHeader(REQUEST_ID_HEADER, requestId);
 
         try {
             filterChain.doFilter(request, response);
         } finally {
-            var durationMs = (System.nanoTime() - startedAt) / 1_000_000;
-            var auth = SecurityContextHolder.getContext().getAuthentication();
-            var userId = "anonymous";
-            if (auth != null && auth.getPrincipal() instanceof AuthUserPrincipal principal) {
-                userId = principal.userId().toString();
-            }
-
-            if (request.getRequestURI().contains("/stream")) {
-                log.debug("Request completed requestId={} method={} path={} status={} durationMs={} userId={}",
-                        requestId, request.getMethod(), request.getRequestURI(), response.getStatus(), durationMs, userId);
-            } else {
-                log.info("Request completed requestId={} method={} path={} status={} durationMs={} userId={}",
-                        requestId, request.getMethod(), request.getRequestURI(), response.getStatus(), durationMs, userId);
-            }
+            // Authentication and trace contexts are cleaned up by inner filters before this point.
             MDC.remove(REQUEST_ID_MDC_KEY);
         }
     }

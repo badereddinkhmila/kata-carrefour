@@ -12,7 +12,9 @@ and automatically reconciles four applications:
 | `devo-carre-observability` | `observability` | `devo-carre-observability` |
 
 The backend and client applications have automated sync, prune, and self-heal
-enabled. They use immutable `sha-<commit>` GHCR tags, not `latest`.
+enabled. They use immutable `sha-<commit>` GHCR tags, not `latest`. Main-branch
+publishes include both `linux/amd64` and `linux/arm64`, so the images work on
+standard cloud nodes and Apple-Silicon Kind nodes.
 
 ## One-Time GitHub Setup
 

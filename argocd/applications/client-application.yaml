@@ -15,7 +15,7 @@ spec:
         - name: image.repository
           value: ghcr.io/badereddinkhmila/kata-carrefour-client
         - name: image.tag
-          value: "sha-2f9e3f42a778154c1bda075fbff1012405cb0c01"
+          value: "sha-1e5efaa8b5e50ee8b5548f7fbcea20964863274e"
         - name: image.pullPolicy
           value: Always
         - name: observability.faroCollectorUpstream
